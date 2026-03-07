@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { createUser } from "../controllers/auth.controller.ts";
+import { createUser, loginUser } from "../controllers/auth.controller.ts";
 import upload  from "../middleware/multer.ts";
 
 const router = Router();
@@ -14,5 +14,7 @@ router.post(
   ]),
   createUser
 );
+
+router.post("/login", loginUser);
 
 export default router;

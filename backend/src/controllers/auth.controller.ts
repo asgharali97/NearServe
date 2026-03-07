@@ -21,7 +21,7 @@ const generateTokens = (userId: string, role: string) => {
   return { accessToken, refreshToken };
 };
 
-const createUser = asyncHandler(async (req:Request, res:Response) => {
+const createUser = asyncHandler(async (req: Request, res: Response) => {
   const { name, email, password, role } = req.body;
 
   if (!name || !email || !password || !role) {
@@ -32,7 +32,7 @@ const createUser = asyncHandler(async (req:Request, res:Response) => {
     throw new ApiError(400, "Role must be customer or provider");
   }
 
-  const existingUser = await User.findOne({email});
+  const existingUser = await User.findOne({ email });
 
   if (existingUser) {
     throw new ApiError(404, "A user with this email already exits");
@@ -71,9 +71,81 @@ const createUser = asyncHandler(async (req:Request, res:Response) => {
 
   return res
     .status(201)
-    .cookie("accessToken", accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 })
-    .cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 })
+    .cookie("accessToken", accessToken, {
+      ...cookieOptions,
+      maxAge: 15 * 60 * 1000,
+    })
+    .cookie("refreshToken", refreshToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
     .json(new ApiRespons(201, user, "user created successfully"));
 });
 
-export { createUser };
+const loginUser = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required");
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (!user.isActive) {
+    throw new ApiError(403, "Account is deactivated");
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  const { accessToken, refreshToken } = generateTokens(
+    user._id.toString(),
+    user.role
+  );
+
+  user.refreshToken = refreshToken;
+  await user.save();
+
+  const loggedUser = await User.findById(user._id).select(
+    "-passwordHash -refreshToken -createdAt -updatedAt -__v"
+  );
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
+    .cookie("refreshToken", refreshToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
+    .json(
+      new ApiRespons(
+        200,
+        {
+          loggedUser
+        },
+        "Login successful"
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req: Request, res: Response) => {
+  return res
+    .status(200)
+    .clearCookie("accessToken")
+    .json(new ApiRespons(200, {}, "Logged out successfully"));
+});
+
+export { createUser, loginUser, logoutUser };
