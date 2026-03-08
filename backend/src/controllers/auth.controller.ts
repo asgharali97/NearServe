@@ -39,6 +39,7 @@ const createUser = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
+  // @ts-ignore
   const avtarFilesPath = req.files?.avatar[0]?.path;
 
   const avatar = await uploadOnCloudinary(avtarFilesPath);
@@ -148,4 +149,10 @@ const logoutUser = asyncHandler(async (req: Request, res: Response) => {
     .json(new ApiRespons(200, {}, "Logged out successfully"));
 });
 
-export { createUser, loginUser, logoutUser };
+const getCurrentUser = asyncHandler(async (req:Request, res:Response) => {
+  return res
+    .status(200)
+    .json(new ApiRespons(200, req.user, "fetched current user successfully"));
+});
+
+export { createUser, loginUser, logoutUser, getCurrentUser };
